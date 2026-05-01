@@ -59,7 +59,7 @@ public sealed partial class DigestDispatcher : IDigestDispatcher
 
             var command = new SendLlmDigestCommand(
                 MessageId: Guid.NewGuid(),
-                Recipient: Environment.GetEnvironmentVariable("AdminEmail") ?? "matheusmeigre@gmail.com",
+                Recipient: Environment.GetEnvironmentVariable("AdminEmail"),
                 TemplateId: "ai-news-digest",
                 Data: dataPayload,
                 Locale: "pt-BR",
