@@ -9,13 +9,61 @@ public sealed record SendLlmDigestCommand(
     DateTimeOffset CreatedAt = default
 );
 
+// ── DTOs de Mudança Individual ──────────────────────────────────────────────────
+
 public record LlmChangeDto(
     string ModelId, 
     string Provider, 
-    string ChangeType, // NewModel, PriceChange, ContextWindowChange, etc.
-    string Severity,   // Breaking ou Digest
+    string ChangeType,
+    string Severity,
     string? FieldName, 
     string? OldValue, 
     string? NewValue,
-    string Description // Ex: "Preço reduzido em 25% (de $0.04 para $0.03)"
+    string Description,
+    string? PricePerMillion = null,
+    string? ContextWindow = null,
+    string? SourceUrl = null
+);
+
+// ── DTOs de Sumário Executivo ───────────────────────────────────────────────────
+
+/// <summary>Dashboard rápido do topo do email. Permite decisão instantânea sobre a relevância.</summary>
+public record DigestSummaryDto(
+    int TotalNewModels,
+    int TotalChanges,
+    List<string> ProvidersAffected,
+    BestCostBenefitDto? BestCostBenefit
+);
+
+/// <summary>Modelo com melhor relação ContextWindow/PricePerMillion.</summary>
+public record BestCostBenefitDto(
+    string ModelId,
+    string PricePerMillion,
+    string? ContextWindow,
+    double EfficiencyScore
+);
+
+// ── DTOs de Agrupamento Hierárquico ─────────────────────────────────────────────
+
+/// <summary>Agrupamento de primeiro nível: todos os modelos de um provedor.</summary>
+public record ProviderGroupDto(
+    string Provider,
+    string ProviderLabel,
+    int ModelCount,
+    List<ModelDigestDto> Models
+);
+
+/// <summary>
+/// Card de modelo com todas as mudanças agrupadas, métricas inline e badges visuais.
+/// Campos de métricas são nullable para resiliência (snapshot sem dados).
+/// </summary>
+public record ModelDigestDto(
+    string ModelId,
+    string HighestSeverity,
+    List<LlmChangeDto> Changes,
+    string? PricePerMillion,
+    string? ContextWindow,
+    string? SourceUrl,
+    string? TechnicalPaperUrl,
+    List<string> Badges
 );
