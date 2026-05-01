@@ -116,7 +116,10 @@ internal sealed partial class HuggingFaceExtractor : IExtractor
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _sourceOptions.HuggingFace.Token);
         }
 
-        var response = await _httpClient.SendAsync(request, cancellationToken);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
+
+        var response = await _httpClient.SendAsync(request, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
