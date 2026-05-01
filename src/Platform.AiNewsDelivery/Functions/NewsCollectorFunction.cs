@@ -66,27 +66,35 @@ public sealed partial class NewsCollectorFunction
             // ── Executa cada extractor registrado ───────────────────────────
             foreach (var extractor in _extractors)
             {
-                LogExtractorStarting(extractor.SourceName);
+                try 
+                {
+                    LogExtractorStarting(extractor.SourceName);
+                    var swExtractor = System.Diagnostics.Stopwatch.StartNew();
+                    
+                    var result = await extractor.ExtractAsync(cancellationToken);
+                    swExtractor.Stop();
 
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                var result = await extractor.ExtractAsync(cancellationToken);
-                stopwatch.Stop();
-
-                result.Match(
-                    onSuccess: snapshots =>
-                    {
-                        var persisted = PersistSnapshots(snapshots, cancellationToken).GetAwaiter().GetResult();
-                        totalModels += persisted;
-                        LogExtractorCompleted(extractor.SourceName, persisted, stopwatch.ElapsedMilliseconds);
-                        allSnapshots.AddRange(snapshots);
-                        return persisted;
-                    },
-                    onFailure: error =>
-                    {
-                        errors.Add(new { source = extractor.SourceName, error, timestamp = DateTime.UtcNow });
-                        LogExtractorFailed(extractor.SourceName, error);
-                        return 0;
-                    });
+                    result.Match(
+                        onSuccess: snapshots =>
+                        {
+                            var persisted = PersistSnapshots(snapshots, cancellationToken).GetAwaiter().GetResult();
+                            totalModels += persisted;
+                            allSnapshots.AddRange(snapshots);
+                            LogExtractorCompleted(extractor.SourceName, persisted, swExtractor.ElapsedMilliseconds);
+                            return persisted;
+                        },
+                        onFailure: error =>
+                        {
+                            errors.Add(new { source = extractor.SourceName, error, timestamp = DateTime.UtcNow });
+                            LogExtractorFailed(extractor.SourceName, error);
+                            return 0;
+                        });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro inesperado no extractor {Extractor}", extractor.SourceName);
+                    errors.Add(new { source = extractor.SourceName, error = ex.Message, timestamp = DateTime.UtcNow });
+                }
             }
 
             // ── Executa motor de comparação ─────────────────────────────────
@@ -97,14 +105,10 @@ public sealed partial class NewsCollectorFunction
                 workerRun.ChangesDetected = changesResult.Value.Count;
                 LogChangesDetected(changesResult.Value.Count);
             }
-            else
+            else if (!changesResult.IsSuccess)
             {
-                workerRun.ChangesDetected = 0;
-                if (!changesResult.IsSuccess)
-                {
-                    errors.Add(new { source = "comparer", error = changesResult.Error, timestamp = DateTime.UtcNow });
-                    LogComparisonFailed(changesResult.Error ?? "Unknown error");
-                }
+                errors.Add(new { source = "comparer", error = changesResult.Error, timestamp = DateTime.UtcNow });
+                LogComparisonFailed(changesResult.Error ?? "Unknown error");
             }
 
             // Garante a persistência das mudanças ANTES do dispatch
@@ -113,19 +117,19 @@ public sealed partial class NewsCollectorFunction
             // ── Atualiza o audit trail e dispara Digest ───────────────────────
             workerRun.FinishedAt = DateTime.UtcNow;
             workerRun.ModelsCollected = totalModels;
-            workerRun.Status = errors.Count == 0
-                ? WorkerRunStatus.Success
-                : WorkerRunStatus.PartialFailure;
+            
+            // Se coletamos algo, o status é pelo menos PartialSuccess
+            workerRun.Status = errors.Count == 0 
+                ? WorkerRunStatus.Success 
+                : (totalModels > 0 ? WorkerRunStatus.PartialFailure : WorkerRunStatus.Failure);
 
             if (errors.Count > 0)
             {
                 workerRun.ErrorsLog = JsonSerializer.Serialize(errors);
             }
-            else
-            {
-                // Dispara o resumo via MassTransit apenas se o ciclo foi completamente bem sucedido
-                await _dispatcher.DispatchPendingChangesAsync(cancellationToken);
-            }
+
+            // Dispara se houver mudanças, mesmo que algum extrator tenha falhado
+            await _dispatcher.DispatchPendingChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
