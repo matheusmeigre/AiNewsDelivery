@@ -76,7 +76,7 @@ public sealed partial class NewsCollectorFunction
 
                     if (result.IsSuccess)
                     {
-                        var snapshots = result.Value;
+                        var snapshots = result.Value!;
                         var persisted = await PersistSnapshots(snapshots, cancellationToken);
                         totalModels += persisted;
                         allSnapshots.AddRange(snapshots);
@@ -90,7 +90,7 @@ public sealed partial class NewsCollectorFunction
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Erro inesperado no extractor {Extractor}", extractor.SourceName);
+                    LogExtractorCriticalError(ex, extractor.SourceName);
                     errors.Add(new { source = extractor.SourceName, error = ex.Message, timestamp = DateTime.UtcNow });
                 }
             }
@@ -205,6 +205,9 @@ public sealed partial class NewsCollectorFunction
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Extractor {SourceName} falhou: {Error}")]
     private partial void LogExtractorFailed(string sourceName, string error);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Erro inesperado no extractor {SourceName}")]
+    private partial void LogExtractorCriticalError(Exception ex, string sourceName);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Falha crítica no ciclo de coleta. WorkerRun {RunId} marcado como {Status}.")]
     private partial void LogCycleFailed(Exception ex, long runId, WorkerRunStatus status);
