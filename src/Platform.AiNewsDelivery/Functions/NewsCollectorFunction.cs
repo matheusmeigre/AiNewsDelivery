@@ -74,21 +74,19 @@ public sealed partial class NewsCollectorFunction
                     var result = await extractor.ExtractAsync(cancellationToken);
                     swExtractor.Stop();
 
-                    result.Match(
-                        onSuccess: snapshots =>
-                        {
-                            var persisted = PersistSnapshots(snapshots, cancellationToken).GetAwaiter().GetResult();
-                            totalModels += persisted;
-                            allSnapshots.AddRange(snapshots);
-                            LogExtractorCompleted(extractor.SourceName, persisted, swExtractor.ElapsedMilliseconds);
-                            return persisted;
-                        },
-                        onFailure: error =>
-                        {
-                            errors.Add(new { source = extractor.SourceName, error, timestamp = DateTime.UtcNow });
-                            LogExtractorFailed(extractor.SourceName, error);
-                            return 0;
-                        });
+                    if (result.IsSuccess)
+                    {
+                        var snapshots = result.Value;
+                        var persisted = await PersistSnapshots(snapshots, cancellationToken);
+                        totalModels += persisted;
+                        allSnapshots.AddRange(snapshots);
+                        LogExtractorCompleted(extractor.SourceName, persisted, swExtractor.ElapsedMilliseconds);
+                    }
+                    else
+                    {
+                        errors.Add(new { source = extractor.SourceName, error = result.Error, timestamp = DateTime.UtcNow });
+                        LogExtractorFailed(extractor.SourceName, result.Error ?? "Erro desconhecido");
+                    }
                 }
                 catch (Exception ex)
                 {
