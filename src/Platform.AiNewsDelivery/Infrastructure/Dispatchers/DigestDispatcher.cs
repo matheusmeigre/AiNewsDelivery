@@ -60,7 +60,7 @@ public sealed partial class DigestDispatcher : IDigestDispatcher
             var command = new SendLlmDigestCommand(
                 MessageId: Guid.NewGuid(),
                 Recipient: Environment.GetEnvironmentVariable("Worker__AdminEmail") ?? throw new InvalidOperationException("Variável Worker__AdminEmail não configurada!"),
-                TemplateId: "ai-news-digest",
+                TemplateId: "ai-news/ai-news-digest",
                 Data: dataPayload,
                 Locale: "pt-BR",
                 CreatedAt: DateTimeOffset.UtcNow
