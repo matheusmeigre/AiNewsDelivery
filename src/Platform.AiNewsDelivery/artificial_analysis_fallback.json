@@ -1,0 +1,22 @@
+[
+  {
+    "id": "gpt-4o",
+    "provider": "OpenAI",
+    "license": "Proprietary",
+    "metrics": {
+      "elo_rating": 1287,
+      "tokens_per_sec": 105.5,
+      "ttft_ms": 250.0
+    }
+  },
+  {
+    "id": "claude-3-5-sonnet",
+    "provider": "Anthropic",
+    "license": "Proprietary",
+    "metrics": {
+      "elo_rating": 1279,
+      "tokens_per_sec": 85.2,
+      "ttft_ms": 320.0
+    }
+  }
+]

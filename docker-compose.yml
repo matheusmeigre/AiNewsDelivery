@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  ainews-delivery:
+    build:
+      context: .
+      dockerfile: src/Platform.AiNewsDelivery/Dockerfile
+    environment:
+      - RabbitMqOptions__Host=rabbitmq
+      - RabbitMqOptions__Username=guest
+      - RabbitMqOptions__Password=guest
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy

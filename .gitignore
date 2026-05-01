@@ -1,0 +1,50 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+
+## Azure Functions
+local.settings.json
+.funcignore
+
+## SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+## EF Core Migrations snapshots (keep only the folder, not SQLite artifacts)
+# Uncomment if you do NOT want to commit migrations:
+# **/Migrations/
+
+## Rider / JetBrains
+.idea/
+*.sln.iml
+
+## Visual Studio Code
+.vscode/
+!.vscode/extensions.json
+
+## OS
+.DS_Store
+Thumbs.db
+
+## NuGet
+*.nupkg
+.nuget/
+packages/
+nuget.config
+
+## Environment
+.env
+.env.*
+*.env
+appsettings.Development.json
+appsettings.*.json
+
+## Logs
+logs/
+*.log

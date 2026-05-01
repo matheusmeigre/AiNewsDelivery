@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Platform.AiNewsDelivery/Platform.AiNewsDelivery.csproj" />
+    <Project Path="src/Platform.Contracts/Platform.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Platform.AiNewsDelivery.Tests/Platform.AiNewsDelivery.Tests.csproj" />
+  </Folder>
+</Solution>
