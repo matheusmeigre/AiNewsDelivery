@@ -38,7 +38,7 @@ public sealed partial class NewsCollectorFunction
 
     [Function(nameof(NewsCollectorFunction))]
     public async Task Run(
-        [TimerTrigger("0 0 */12 * * *"
+        [TimerTrigger("%Worker:CronSchedule%", UseMonitor = false
 #if DEBUG
         , RunOnStartup = true
 #endif
