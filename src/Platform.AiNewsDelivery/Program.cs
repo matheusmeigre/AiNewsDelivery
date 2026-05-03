@@ -158,7 +158,17 @@ try
             // ── Extractors: registrados como IExtractor (resolvidos via IEnumerable) ─
             services.AddTransient<IExtractor, OpenRouterExtractor>();
             services.AddTransient<IExtractor, HuggingFaceExtractor>();
-            services.AddHttpClient<IExtractor, ArtificialAnalysisExtractor>()
+            services.AddHttpClient<IExtractor, ArtificialAnalysisExtractor>(client =>
+            {
+                client.BaseAddress = new Uri(sourceConfig.ArtificialAnalysis.BaseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Platform-AiNewsDelivery/1.0");
+
+                if (!string.IsNullOrWhiteSpace(sourceConfig.ArtificialAnalysis.ApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("x-api-key", sourceConfig.ArtificialAnalysis.ApiKey);
+                }
+            })
                 .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(
                     3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))
                         + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 500))))

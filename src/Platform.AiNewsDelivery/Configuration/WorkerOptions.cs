@@ -11,6 +11,10 @@ public sealed class NewsWorkerOptions
     public string CronSchedule { get; init; } = "0 0 */12 * * *";
 
     [Required]
+    [EmailAddress]
+    public string AdminEmail { get; init; } = string.Empty;
+
+    [Required]
     public string DatabasePath { get; init; } = "news-delivery.db";
 
     [Range(1, 10)]

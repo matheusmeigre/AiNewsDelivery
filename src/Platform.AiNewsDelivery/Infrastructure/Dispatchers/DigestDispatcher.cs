@@ -3,8 +3,10 @@ using System.Text.Json;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Platform.AiNewsDelivery.Domain.Enums;
 using Platform.AiNewsDelivery.Domain.Models;
+using Platform.AiNewsDelivery.Configuration;
 using Platform.AiNewsDelivery.Infrastructure.Persistence;
 using MSEMC.Messaging.Commands;
 
@@ -19,6 +21,7 @@ public sealed partial class DigestDispatcher : IDigestDispatcher
 {
     private readonly NewsDbContext _dbContext;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly NewsWorkerOptions _workerOptions;
     private readonly ILogger<DigestDispatcher> _logger;
 
     /// <summary>Mapeamento de provider interno → label humano para o email.</summary>
@@ -29,10 +32,15 @@ public sealed partial class DigestDispatcher : IDigestDispatcher
         ["ArtificialAnalysis"] = "Artificial Analysis"
     };
 
-    public DigestDispatcher(NewsDbContext dbContext, IPublishEndpoint publishEndpoint, ILogger<DigestDispatcher> logger)
+    public DigestDispatcher(
+        NewsDbContext dbContext,
+        IPublishEndpoint publishEndpoint,
+        IOptions<NewsWorkerOptions> workerOptions,
+        ILogger<DigestDispatcher> logger)
     {
         _dbContext = dbContext;
         _publishEndpoint = publishEndpoint;
+        _workerOptions = workerOptions.Value;
         _logger = logger;
     }
 
@@ -55,7 +63,7 @@ public sealed partial class DigestDispatcher : IDigestDispatcher
 
             var command = new SendLlmDigestCommand(
                 MessageId: Guid.NewGuid(),
-                Recipient: Environment.GetEnvironmentVariable("Worker__AdminEmail") ?? throw new InvalidOperationException("Variável Worker__AdminEmail não configurada!"),
+                Recipient: _workerOptions.AdminEmail,
                 TemplateId: "ai-news/ai-news-digest",
                 Data: dataPayload,
                 Locale: "pt-BR",

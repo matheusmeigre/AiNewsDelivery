@@ -30,7 +30,8 @@ public sealed class HuggingFaceSourceOptions
 public sealed class ArtificialAnalysisSourceOptions
 {
     [Required]
-    public string BaseUrl { get; init; } = "https://api.artificialanalysis.ai";
+    public string BaseUrl { get; init; } = "https://artificialanalysis.ai/api/v2";
+    public string ModelsPath { get; init; } = "data/llms/models";
     public string? ApiKey { get; init; }
     public bool Enabled { get; init; }
 }

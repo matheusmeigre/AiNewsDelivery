@@ -15,6 +15,7 @@ namespace Platform.AiNewsDelivery.Infrastructure.Extractors;
 public sealed partial class ArtificialAnalysisExtractor : IExtractor
 {
     private readonly HttpClient _httpClient;
+    private readonly SourceOptions _sourceOptions;
     private readonly ILogger<ArtificialAnalysisExtractor> _logger;
     private readonly NewsDbContext _dbContext;
     private readonly string _fallbackFilePath = "artificial_analysis_fallback.json";
@@ -23,10 +24,12 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
 
     public ArtificialAnalysisExtractor(
         HttpClient httpClient,
+        IOptions<SourceOptions> sourceOptions,
         ILogger<ArtificialAnalysisExtractor> logger,
         NewsDbContext dbContext)
     {
         _httpClient = httpClient;
+        _sourceOptions = sourceOptions.Value;
         _logger = logger;
         _dbContext = dbContext;
     }
@@ -35,6 +38,12 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
 
     public async Task<Result<IReadOnlyList<CanonicalSnapshot>>> ExtractAsync(CancellationToken cancellationToken = default)
     {
+        if (!_sourceOptions.ArtificialAnalysis.Enabled)
+        {
+            LogSourceDisabled();
+            return Result<IReadOnlyList<CanonicalSnapshot>>.Ok(Array.Empty<CanonicalSnapshot>());
+        }
+
         try
         {
             var rawModels = await FetchModelsAsync(cancellationToken);
@@ -58,9 +67,12 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
 
                 var metrics = new Metrics
                 {
-                    EloRating = raw.Metrics?.EloRating,
-                    TokensPerSec = raw.Metrics?.TokensPerSec,
-                    TtftMs = raw.Metrics?.TtftMs
+                    EloRating = raw.Evaluations?.ArtificialAnalysisIntelligenceIndex,
+                    TokensPerSec = raw.MedianOutputTokensPerSecond,
+                    PricePerMillion = raw.Pricing?.Price1MBlended3To1,
+                    TtftMs = raw.MedianTimeToFirstTokenSeconds is double ttftSeconds
+                        ? ttftSeconds * 1000d
+                        : null
                 };
 
                 var metadata = new ModelMetadata
@@ -98,13 +110,15 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.artificialanalysis.ai/v1/models", cancellationToken);
+            var response = await _httpClient.GetAsync(_sourceOptions.ArtificialAnalysis.ModelsPath.TrimStart('/'), cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var result = JsonSerializer.Deserialize<List<AAModelDto>>(content, JsonConstants.DefaultOptions);
+                var result = DeserializeModels(content);
                 if (result != null) return result;
             }
+
+            LogApiReturnedUnexpectedStatus((int)response.StatusCode);
         }
         catch (Exception ex)
         {
@@ -116,7 +130,7 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
             try
             {
                 var json = await File.ReadAllTextAsync(_fallbackFilePath, cancellationToken);
-                var result = JsonSerializer.Deserialize<List<AAModelDto>>(json, JsonConstants.DefaultOptions);
+                var result = DeserializeModels(json);
                 if (result != null) return result;
             }
             catch (Exception ex)
@@ -128,30 +142,62 @@ public sealed partial class ArtificialAnalysisExtractor : IExtractor
         return new List<AAModelDto>();
     }
 
+    private static List<AAModelDto>? DeserializeModels(string json)
+    {
+        var response = JsonSerializer.Deserialize<AAApiResponseDto>(json, JsonConstants.DefaultOptions);
+        if (response?.Data is { Count: > 0 })
+        {
+            return response.Data;
+        }
+
+        return JsonSerializer.Deserialize<List<AAModelDto>>(json, JsonConstants.DefaultOptions);
+    }
+
+    private sealed class AAApiResponseDto
+    {
+        [JsonPropertyName("data")]
+        public List<AAModelDto>? Data { get; set; }
+    }
+
     // DTOs baseados na estrutura esperada de retorno
     private sealed class AAModelDto
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
 
-        [JsonPropertyName("metrics")]
-        public AAMetricsDto? Metrics { get; set; }
+        [JsonPropertyName("evaluations")]
+        public AAEvaluationsDto? Evaluations { get; set; }
+
+        [JsonPropertyName("pricing")]
+        public AAPricingDto? Pricing { get; set; }
+
+        [JsonPropertyName("median_output_tokens_per_second")]
+        public double? MedianOutputTokensPerSecond { get; set; }
+
+        [JsonPropertyName("median_time_to_first_token_seconds")]
+        public double? MedianTimeToFirstTokenSeconds { get; set; }
     }
 
-    private sealed class AAMetricsDto
+    private sealed class AAEvaluationsDto
     {
-        [JsonPropertyName("elo_rating")]
-        public double? EloRating { get; set; }
+        [JsonPropertyName("artificial_analysis_intelligence_index")]
+        public double? ArtificialAnalysisIntelligenceIndex { get; set; }
+    }
 
-        [JsonPropertyName("tokens_per_sec")]
-        public double? TokensPerSec { get; set; }
-
-        [JsonPropertyName("ttft_ms")]
-        public double? TtftMs { get; set; }
+    private sealed class AAPricingDto
+    {
+        [JsonPropertyName("price_1m_blended_3_to_1")]
+        public decimal? Price1MBlended3To1 { get; set; }
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Falha ao buscar Artificial Analysis via API. Tentando fallback local.")]
     private partial void LogApiFetchFailed(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Artificial Analysis desabilitado via configuração. Pulando coleta.")]
+    private partial void LogSourceDisabled();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Artificial Analysis retornou status HTTP inesperado {StatusCode}. Tentando fallback local.")]
+    private partial void LogApiReturnedUnexpectedStatus(int statusCode);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Falha ao ler o fallback local {FallbackPath}")]
     private partial void LogFallbackFailed(Exception ex, string fallbackPath);
